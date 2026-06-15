@@ -1,21 +1,42 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+// Token verify karo
 const verifyToken = (req, res, next) => {
-  const token = req.headers['authorization'];
-
+  let token = req.headers['authorization'];
+  console.log("token", token);
   if (!token) {
-    return res.status(403).json({ message: 'Missing JWT token' });
+    return res.status(403).json({ message: '❌ Token nahi mila! Login karo pehle.' });
+  }
+
+  if (token.startsWith('Bearer ')) {
+    token = token.split(' ')[1];
   }
 
   try {
-    // Token verify 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // save user info in request 
-    next();            
+    console.log("decoded", decoded);
+    req.user = decoded;
+    next();
   } catch (err) {
-    return res.status(401).json({ message: 'Invalid token!' });
+    return res.status(401).json({ message: '❌ Token invalid hai!', err });
   }
 };
 
-module.exports = verifyToken;
+//  Sirf Author access kar sakta hai
+const authorOnly = (req, res, next) => {
+  if (req.user.role !== 'author') {
+    return res.status(403).json({ message: '❌ Sirf Authors ye kar sakte hai!' });
+  }
+  next();
+};
+
+// Sirf User access kar sakta hai
+const userOnly = (req, res, next) => {
+  if (req.user.role !== 'user') {
+    return res.status(403).json({ message: '❌ Sirf Users ye kar sakte hai!' });
+  }
+  next();
+};
+
+module.exports = { verifyToken, authorOnly, userOnly };
