@@ -151,12 +151,12 @@ router.get('/:id/reviews', async (req, res) => {
 
 router.post('/:id/reviews', verifyToken, async (req, res) => {
   try {
-    const { rating, review_text } = req.body;
+    const { rating } = req.body;
     const user_id = req.user.id;
     const book_id = req.params.id;
 
-    if (!rating || !review_text) {
-      return res.status(400).json({ message: 'Rating and review text are required.' });
+    if (!rating) {
+      return res.status(400).json({ message: 'Rating is required.' });
     }
 
     const ratingNum = parseInt(rating);
@@ -171,9 +171,10 @@ router.post('/:id/reviews', verifyToken, async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO reviews (book_id, user_id, rating, review_text) VALUES ($1, $2, $3, $4) RETURNING *',
-      [book_id, user_id, ratingNum, review_text]
+      'INSERT INTO reviews (book_id, user_id, rating) VALUES ($1, $2, $3) RETURNING *',
+      [book_id, user_id, ratingNum]
     );
+
 
     const response = {
       ...result.rows[0],
