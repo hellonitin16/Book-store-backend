@@ -1,12 +1,14 @@
 const express = require('express');
-const pool = require('./db');
+const db = require('./db');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 const authRouter = require('./routes/auth');
@@ -20,9 +22,9 @@ app.use('/api/books', booksRouter);
 app.use('/api/purchases', purchasesRouter);
 
 // DB Test
-pool.connect((err, client, release) => {
+db.connect((err) => {
   if (err) console.log(' DB Failed:', err.message);
-  else { console.log(' Neon DB Connected!'); release(); }
+  else { console.log(' MS Access DB Connected!'); }
 });
 
 const PORT = process.env.PORT || 3000;

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const db = require('../db');
 const { verifyToken, userOnly } = require('../middleware/auth');
 
 
@@ -9,21 +9,25 @@ router.post('/', verifyToken, userOnly, async (req, res) => {
     const { book_id, quantity } = req.body;
     const user_id = req.user.id;
 
-    if (!quantity || !Number.isInteger(quantity) || quantity <= 0) {
+    const qtyVal = quantity !== undefined ? Number(quantity) : undefined;
+    if (!qtyVal || !Number.isInteger(qtyVal) || qtyVal <= 0) {
       return res.status(400).json({ message: 'Valid quantity (positive integer)!' });
     }
 
-    const book = await pool.query('SELECT * FROM books WHERE id=$1', [book_id]);
+    const book = await db.query('SELECT * FROM books WHERE id=?', [Number(book_id)]);
     if (book.rows.length === 0) {
       return res.status(404).json({ message: 'Book not found!' });
     }
 
-    const total_price = book.rows[0].price * quantity;
+    const total_price = book.rows[0].price * qtyVal;
 
-    const result = await pool.query(
-      'INSERT INTO purchases (user_id, book_id, quantity, total_price) VALUES ($1, $2, $3, $4) RETURNING *',
-      [user_id, book_id, quantity, total_price]
+    const insertResult = await db.query(
+      'INSERT INTO purchases (user_id, book_id, quantity, total_price) VALUES (?, ?, ?, ?)',
+      [Number(user_id), Number(book_id), qtyVal, total_price]
     );
+
+    // Fetch the inserted purchase
+    const result = await db.query('SELECT * FROM purchases WHERE id=?', [insertResult.lastId]);
 
     res.status(201).json({
       success: true,
@@ -38,15 +42,15 @@ router.post('/', verifyToken, userOnly, async (req, res) => {
 
 router.get('/my', verifyToken, userOnly, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.query(`
       SELECT p.id, p.quantity, p.total_price, p.purchased_at,
-             b.book_name, b.price, u.name as author_name
-      FROM purchases p
-      JOIN books b ON p.book_id = b.id
-      JOIN users u ON b.author_id = u.id
-      WHERE p.user_id = $1
+             b.book_name, b.price, u.[name] AS author_name
+      FROM (purchases AS p
+      INNER JOIN books AS b ON p.book_id = b.id)
+      INNER JOIN users AS u ON b.author_id = u.id
+      WHERE p.user_id = ?
       ORDER BY p.purchased_at DESC
-    `, [req.user.id]);
+    `, [Number(req.user.id)]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });

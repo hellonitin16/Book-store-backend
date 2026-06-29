@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const db = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
@@ -13,8 +13,8 @@ router.post('/register', async (req, res) => {
 
     const userRole = role === 'author' ? 'author' : 'user';
 
-    const existing = await pool.query(
-      'SELECT * FROM users WHERE email=$1', [email]
+    const existing = await db.query(
+      'SELECT * FROM users WHERE email=?', [email]
     );
     if (existing.rows.length > 0) {
       return res.status(400).json({ message: 'Email already registered!' });
@@ -22,9 +22,14 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+    // INSERT — no RETURNING in Access, use lastId + separate SELECT
+    const insertResult = await db.query(
+      'INSERT INTO users ([name], email, [password], [role]) VALUES (?, ?, ?, ?)',
       [name, email, hashedPassword, userRole]
+    );
+
+    const result = await db.query(
+      'SELECT id, [name], email, [role] FROM users WHERE id=?', [insertResult.lastId]
     );
 
     res.status(201).json({
@@ -45,8 +50,8 @@ router.post('/login', async (req, res) => {
 
     console.log(req.body);
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email=$1 AND role=$2', [email, role]
+    const result = await db.query(
+      'SELECT * FROM users WHERE email=? AND [role]=?', [email, role]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: `${role} not found!` });
